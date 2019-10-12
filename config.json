@@ -1,8 +1,10 @@
 {
+    "bot_name": "@yourStrangeBot",
     "token": "867095749:AAE4RK683xbfEwspjOO18DhbdOat6b7Ry00",
     "mongo_url": "mongodb://localhost:27017/testdb",
     "assets": {
         "exchange_api": "https://api.privatbank.ua/p24api/pubinfo?json&exchange&coursid=5",
         "quotes_api": "http://api.forismatic.com/api/1.0/?method=getQuote&key=&format=json&lang=ru"
-    }
+    },
+    "data": {}
 }

@@ -4,6 +4,7 @@ const request = require('request');
 const fs = require('fs');
 const database = require('./database');
 const observer = require('./observer');
+const helper = require('./helper')
 const config = require('./config');
 
 /* ************** Подключаем БД ************** */
@@ -18,6 +19,14 @@ database()
 
 const ExchangeRate = require('./models/ExchangeRate');
 const Sticker = require('./models/Sticker');
+
+const flags = new Map([
+   ["USD",  "🇺🇸"],
+   ["EUR",  "🇪🇺"],
+   ["RUR",  "🇷🇺"],
+   ["UAH",  "🇺🇦"],
+   ["BTC",  "🏁"]
+])
 
 /* ************** Создание бота ************** */
 const token = config.token;
@@ -42,7 +51,7 @@ bot.onText(/\/spam (.+)/, (msg, match) => {
          res = parseInt(res);
       else
          res = 1
-      for(let i = 0; i < res; i++) {
+      for (let i = 0; i < res; i++) {
          setTimeout(() => {
             let previous = {};
             let t = 0;
@@ -57,15 +66,16 @@ bot.onText(/\/spam (.+)/, (msg, match) => {
                            md += `\n     @via *${content.quoteAuthor}*`;
                         else
                            md += `\n     @via *Someone unknow*`;
-                        bot.sendMessage(chatId, md, { parse_mode: "Markdown"});
+                        bot.sendMessage(chatId, md, {
+                           parse_mode: "Markdown"
+                        });
                         previous = content;
-                     }
-                     else i--;
+                     } else i--;
                   }
                });
                t++
                if (t == 50)
-               console.warn("WARN: t = " + t);
+                  console.warn("WARN: t = " + t);
             }
          }, 3300 + Math.random(0, 1000));
       }
@@ -74,15 +84,18 @@ bot.onText(/\/spam (.+)/, (msg, match) => {
    }
 });
 
+
 bot.onText(/\/sticker (.+)/, (msg, match) => {
    const chatId = msg.chat.id;
    const res = match[1];
    Sticker.find({}).then(items => {
-      const stickers = items.filter(item => item.emoji === query.data);
-      const rand = Math.random(0, )
-      bot.sendSticker(chatId, stickers.length);
-      const sticker = stickers[rand];
-   }).catch(err => console.error('ERROR: ' + err));
+      const stickers = items.filter(item => item.emoji === res);
+      const rand = helper.randint(0, stickers.length - 1);
+      const sticker = stickers[rand].file_id;
+      bot.sendSticker(chatId, sticker);
+   }).catch(err => {
+      console.error('ERROR: ' + err)
+   });
 });
 
 bot.on('message', (msg) => {
@@ -96,31 +109,43 @@ bot.on('message', (msg) => {
    //    }, 3300 + Math.random(0, 1000));
    if (msg.sticker) {
       // Добавляем в нашу базу полученый стикер
-      Sticker.create({
-         file_id: msg.sticker.file_id,
-         emoji: msg.sticker.emoji
+      Sticker.find({}).then(items => {
+         if (!items.find(item => item.file_id === msg.sticker.file_id)) {
+            Sticker.create({
+               file_id: msg.sticker.file_id,
+               emoji: msg.sticker.emoji
+            });
+         } else {
+            Sticker.updateOne({
+               file_id: msg.sticker.file_id,
+               emoji: msg.sticker.emoji
+            });
+         }
+      }).catch(err => {
+         console.error('ERROR: ' + err);
       });
    } else {
       switch (msg.text) {
          case "курс валют":
-         case "/curse":
+         case "/course":
+         case "/course" + config.bot_name:         
             bot.sendMessage(chatId, 'Выберите валюту:', {
                reply_markup: {
                   inline_keyboard: [
                      [{
-                           text: "€ - EUR",
+                           text: "🇪🇺 EUR",
                            callback_data: "EUR"
                         },
                         {
-                           text: "$ - USD",
+                           text: "🇺🇸 USD",
                            callback_data: "USD"
                         },
                         {
-                           text: "₽ - RUR",
+                           text: "🇷🇺 RUR",
                            callback_data: "RUR"
                         },
                         {
-                           text: "₿ - BTC",
+                           text: "🏁 BTC",
                            callback_data: "BTC"
                         }
                      ]
@@ -128,6 +153,15 @@ bot.on('message', (msg) => {
                }
             });
             break;
+         case "/sticker":
+         case "/sticker" + config.bot_name:         
+            Sticker.find({}).then(items => {
+               const rand = helper.randint(0, items.length - 1);
+               const sticker = items[rand].file_id;
+               bot.sendSticker(chatId, sticker);
+            }).catch(err => {
+               console.error('ERROR: ' + err)
+            });
       }
    }
 });
@@ -137,7 +171,7 @@ bot.on('callback_query', (query) => {
    ExchangeRate.find({}).then(items => {
       const result = items.filter(item => item.ccy === query.data)[0];
       let md = `
-         *${result.ccy} 💱 ${result.base_ccy}*
+         *${flags.get(result.ccy)} ${result.ccy} 💱 ${flags.get(result.base_ccy)} ${result.base_ccy}*
          Buy:  _${result.buy}_
          Sale: _${result.sale}_
          `;
@@ -146,4 +180,3 @@ bot.on('callback_query', (query) => {
       });
    }).catch(err => console.error('ERROR: ' + err));
 });
-
