@@ -1,14 +1,22 @@
 {
-  "name": "node-bot-spammer",
-  "version": "1.0.0",
+  "name": "node-tme-bot",
+  "version": "0.0.2",
   "description": "",
   "main": "index.js",
   "scripts": {
     "dev": "nodemon index"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YuraYe/node-tme-bot.git"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/YuraYe/node-tme-bot/issues"
+  },
+  "homepage": "https://github.com/YuraYe/node-tme-bot#readme",
   "dependencies": {
     "json5": "^2.1.1",
     "mongoose": "^5.7.4",

@@ -2,7 +2,8 @@
 const TelegramBot = require('node-telegram-bot-api');
 const request = require('request');
 const fs = require('fs');
-const database = require('./database')
+const database = require('./database');
+const observer = require('./observer');
 const config = require('./config');
 
 /* ************** Подключаем БД ************** */
@@ -18,52 +19,13 @@ database()
 const ExchangeRate = require('./models/ExchangeRate');
 const Sticker = require('./models/Sticker');
 
-/* ************** Обновляем "базу данных" ************** */
-function watch() {
-   let i = 1;
-   console.log('Running updater...');
-   UpdateDB.ExchangeRate();
-   setTimeout(() => {
-      console.log(i.toString() + ' Updating data... ');
-      UpdateDB.ExchangeRate();
-      i++;
-   }, 360000 + Math.random(0, 10000));
-}
-
-class UpdateDB {
-   static ExchangeRate() {
-      request(config.assets.exchange_api, (err, req, body) => {
-         if (err) throw err;
-         else {
-            const content = JSON.parse(body);
-            for (let i = 0; i < content.length; i++) {
-               let {
-                  ccy,
-                  base_ccy,
-                  buy,
-                  sale
-               } = content[i];
-               buy = (parseInt(+buy * 100)) / 100;
-               sale = (parseInt(+sale * 100)) / 100;
-               ExchangeRate.create({
-                  ccy: ccy,
-                  base_ccy: base_ccy,
-                  buy: buy,
-                  sale: sale
-               });
-            }
-         }
-      });
-   }
-}
-
 /* ************** Создание бота ************** */
 const token = config.token;
 const bot = new TelegramBot(token, {
    polling: true
 });
 
-watch();
+observer(ExchangeRate);
 
 /* ************** Ответы на запросы ************** */
 bot.onText(/\/echo (.+)/, (msg, match) => {
@@ -82,16 +44,29 @@ bot.onText(/\/spam (.+)/, (msg, match) => {
          res = 1
       for(let i = 0; i < res; i++) {
          setTimeout(() => {
-            request(config.assets.quotes_api, (err, req, body) => {
-               if (err) console.error(err);
-               else {
-                  const content = JSON.parse(body);
-                  bot.sendMessage(chatId, `
-                  _${content.quoteText}_
-                  @via *${content.quoteAuthor}*
-                  `, { parse_mode: "Markdown"})
-               }
-            });
+            let previous = {};
+            let t = 0;
+            while (t < 50) {
+               request(config.assets.quotes_api, (err, req, body) => {
+                  if (err) console.error(err);
+                  else {
+                     const content = JSON.parse(body);
+                     if (content != previous) {
+                        let md = `_${content.quoteText}_`;
+                        if (content.quoteAuthor != '')
+                           md += `\n     @via *${content.quoteAuthor}*`;
+                        else
+                           md += `\n     @via *Someone unknow*`;
+                        bot.sendMessage(chatId, md, { parse_mode: "Markdown"});
+                        previous = content;
+                     }
+                     else i--;
+                  }
+               });
+               t++
+               if (t == 50)
+               console.warn("WARN: t = " + t);
+            }
          }, 3300 + Math.random(0, 1000));
       }
    } catch (e) {
